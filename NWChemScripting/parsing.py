@@ -120,96 +120,114 @@ def parse_alpha_beta_vector_linenums(lines):
     return alphalinenums, betalinenums
 
 
-def parse_movec_info_all(lines):
-    '''Returns avecs, bvecs'''
-    if os.path.exists(lines):
-        with open(lines, 'r') as file:
-            lines = file.readlines()
+def parse_movec_info_all(filename, vector_group = -1):
+    '''
+    Returns avecs, bvecs
+    
+    Depending on how the calculation is set up 
+    (ex: a DFT and TDDFT step) there might be multiple
+    groups of molecular orbital vectors. The variable
+    `vector_group` determines which one of these
+    to parse.
+
+    A vector_group of -1 just uses the last vector
+    group in the output file.
+    '''
+ 
+    with open(filename, 'r') as file:
+        lines = file.readlines()
+
     vectorre = re.compile(r'\s+Vector\s+(\d+)\s+Occ=(\d+\.\d+)D(.\d+)\s+E=([\- ]?\d+.\d+)D(.\d+)')
     mocenterre = re.compile(r'\s+MO Center=\s+(.\d+\.\d+)D(.\d+),\s+(.\d+\.\d+)D(.\d+),\s+(.\d+\.\d+)D(.\d+),\s+r\^2=\s+(\d+\.\d+)D(.\d+)')
     bfnre = re.compile(r'\s+(\d+)\s+(\-?\d+\.\d+)\s+(\d+)\s+(\w+)\s+(\w+)')
-    alphalinenums, betalinenums = parse_alpha_beta_vector_linenums(lines)
     
+    alphalinenums, betalinenums = parse_alpha_beta_vector_linenums(lines)
+    a_start = alphalinenums[vector_group]
+    b_start = betalinenums[vector_group]
+    a_end = b_start
+    if betalinenums[vector_group] == betalinenums[-1]:
+        b_end = -1
+    else:
+        b_end = alphalinenums[vector_group + 1]
     avectors = {}
     bvectors = {}
 
-    for a, b in zip(alphalinenums, betalinenums):
-        for l in lines[a:b]:
-            m = vectorre.match(l)
-            if m:
-                # save previously parsed vector and instantiate new one
-                try:
-                    avectors[vecnum] = vec
-                except UnboundLocalError:
-                    pass
-                
-                vecnum = int(m.group(1))
-                vec = {}
-                vec['Occupation'] = float(m.group(2)) * 10 ** int(m.group(3))
-                vec['Energy'] = float(m.group(4)) * 10 ** int(m.group(5))
-                vec['Bfns'] = []
 
-            m = mocenterre.match(l)
-            if m:
-                vec['MO Center'] = np.array([float(m.group(1)) * 10 ** int(m.group(2)),
-                                            float(m.group(3)) * 10 ** int(m.group(4)),
-                                            float(m.group(5)) * 10 ** int(m.group(6))])
-                vec['r^s'] = float(m.group(7)) * 10 ** int(m.group(8))
-                
-            m = bfnre.findall(l)
-            if m:
-                for bfn in m:
-                    bfndict = {}
-                    bfndict['Bfn. #'] = int(bfn[0])
-                    bfndict['Coefficient'] = float(bfn[1])
-                    bfndict['Atom #'] = int(bfn[2])
-                    bfndict['Atom'] = bfn[3]
-                    bfndict['Atom Fn.'] = bfn[4]
-                    vec['Bfns'].append(bfndict)
-                continue
-        
-        # Assign last vector once line loop ends
-        avectors[vecnum] = vec
+    for l in lines[a_start:a_end]:
+        m = vectorre.match(l)
+        if m:
+            # save previously parsed vector and instantiate new one
+            try:
+                avectors[vecnum] = vec
+            except UnboundLocalError:
+                pass
+            
+            vecnum = int(m.group(1))
+            vec = {}
+            vec['Occupation'] = float(m.group(2)) * 10 ** int(m.group(3))
+            vec['Energy'] = float(m.group(4)) * 10 ** int(m.group(5))
+            vec['Bfns'] = []
+
+        m = mocenterre.match(l)
+        if m:
+            vec['MO Center'] = np.array([float(m.group(1)) * 10 ** int(m.group(2)),
+                                        float(m.group(3)) * 10 ** int(m.group(4)),
+                                        float(m.group(5)) * 10 ** int(m.group(6))])
+            vec['r^s'] = float(m.group(7)) * 10 ** int(m.group(8))
+            
+        m = bfnre.findall(l)
+        if m:
+            for bfn in m:
+                bfndict = {}
+                bfndict['Bfn. #'] = int(bfn[0])
+                bfndict['Coefficient'] = float(bfn[1])
+                bfndict['Atom #'] = int(bfn[2])
+                bfndict['Atom'] = bfn[3]
+                bfndict['Atom Fn.'] = bfn[4]
+                vec['Bfns'].append(bfndict)
+            continue
+    
+    # Assign last vector once line loop ends
+    avectors[vecnum] = vec
 
                     
-    for a, b in zip(alphalinenums, betalinenums):
-        for l in lines[b:]: #TODO fix this, if alpha and beta vectors get printed twice, this will accidentally parse all
-            m = vectorre.match(l)
-            if m:
-                # save previously parsed vector and instantiate new one
-                try:
-                    bvectors[vecnum] = vec
-                except UnboundLocalError:
-                    pass
-                
-                vecnum = int(m.group(1))
-                vec = {}
-                vec['Occupation'] = float(m.group(2)) * 10 ** int(m.group(3))
-                vec['Energy'] = float(m.group(4)) * 10 ** int(m.group(5))
-                vec['Bfns'] = []
+    for l in lines[b_start:b_end]:
+        m = vectorre.match(l)
+        if m:
+            # save previously parsed vector and instantiate new one
+            try:
+                bvectors[vecnum] = vec
+            except UnboundLocalError:
+                pass
+            
+            vecnum = int(m.group(1))
+            vec = {}
+            vec['Occupation'] = float(m.group(2)) * 10 ** int(m.group(3))
+            vec['Energy'] = float(m.group(4)) * 10 ** int(m.group(5))
+            vec['Bfns'] = []
 
-            m = mocenterre.match(l)
-            if m:
-                vec['MO Center'] = np.array([float(m.group(1)) * 10 ** int(m.group(2)),
-                                            float(m.group(3)) * 10 ** int(m.group(4)),
-                                            float(m.group(5)) * 10 ** int(m.group(6))])
-                vec['r^s'] = float(m.group(7)) * 10 ** int(m.group(8))
-                
-            m = bfnre.findall(l)
-            if m:
-                for bfn in m:
-                    bfndict = {}
-                    bfndict['Bfn. #'] = int(bfn[0])
-                    bfndict['Coefficient'] = float(bfn[1])
-                    bfndict['Atom #'] = int(bfn[2])
-                    bfndict['Atom'] = bfn[3]
-                    bfndict['Atom Fn.'] = bfn[4]
-                    vec['Bfns'].append(bfndict)
-                continue
+        m = mocenterre.match(l)
+        if m:
+            vec['MO Center'] = np.array([float(m.group(1)) * 10 ** int(m.group(2)),
+                                        float(m.group(3)) * 10 ** int(m.group(4)),
+                                        float(m.group(5)) * 10 ** int(m.group(6))])
+            vec['r^s'] = float(m.group(7)) * 10 ** int(m.group(8))
+            
+        m = bfnre.findall(l)
+        if m:
+            for bfn in m:
+                bfndict = {}
+                bfndict['Bfn. #'] = int(bfn[0])
+                bfndict['Coefficient'] = float(bfn[1])
+                bfndict['Atom #'] = int(bfn[2])
+                bfndict['Atom'] = bfn[3]
+                bfndict['Atom Fn.'] = bfn[4]
+                vec['Bfns'].append(bfndict)
+            continue
         
         # Assign last vector once line loop ends
         bvectors[vecnum] = vec
-            
+           
     return avectors, bvectors
 
 

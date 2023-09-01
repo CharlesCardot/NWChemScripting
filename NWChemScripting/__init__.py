@@ -392,6 +392,10 @@ def proper_spectrum_from_transitions(transitions, lorentz_ev=1, erange=None, num
     
     spectrum = np.zeros_like(x_eval)
     
+    # Charles Note: I don't know where this comes from,
+    # but overall it doesn't produce a noticably different result
+    # from the regualar `spectrum_from_transitions` function
+    
     #do proper energy scaling
     sy = x ** 2 * y
     y = sy / sy.sum()

@@ -143,12 +143,12 @@ def calc_orbitals_fractions(orbs, erange, normalizerootcoeffs=True, normalizebfn
                 orbs.loc[subset, 'Coefficient'] /= orbs.loc[subset, 'Coefficient'].abs().sum()
     
     fractions = {}
-    for row in orbs.values:
+    for i, row in orbs.iterrows():
         try:
-            fractions['{} {}'.format(row[0], row[2][0])] += abs(float(row[4])) * abs(row[8]) * abs(row[6])
+            fractions['{} {}'.format(row['Atom'], row['Atom Fn.'][0])] += abs(row['Coefficient']) * abs(row['root coeff abs.']) * abs(row['osc str'])
         except KeyError:
-            fractions['{} {}'.format(row[0], row[2][0])] = 0.
-            fractions['{} {}'.format(row[0], row[2][0])] += abs(float(row[4])) * abs(row[8]) * abs(row[6])
+            fractions['{} {}'.format(row['Atom'], row['Atom Fn.'][0])] = 0.
+            fractions['{} {}'.format(row['Atom'], row['Atom Fn.'][0])] += abs(row['Coefficient']) * abs(row['root coeff abs.']) * abs(row['osc str'])
             
     normedfracs = {}
     for k, f in fractions.items():
@@ -206,7 +206,9 @@ def get_transition_moment_projected_strength(roots, direction):
         
         tmvec = v['Transition Moments (XYZ)']
         tmvec = tmvec.copy()
-        tmvec /= np.linalg.norm(tmvec)
+        norm = np.linalg.norm(tmvec)
+        if norm > 0:
+            tmvec /= np.linalg.norm(tmvec)
         direction /= np.linalg.norm(direction)
         proj = v['Total Oscillator Strength'] * np.dot(tmvec, direction) ** 2
         if not np.isnan(proj):
